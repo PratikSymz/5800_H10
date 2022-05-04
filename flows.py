@@ -32,55 +32,94 @@ def maxflow(G, s, t):
     Gf = sg.copyGraph(G)
     # Run the BFS algorithm to determine the parent pointers in the graph
     _, parents, _ = sg.BFS(Gf, s)
-    print(parents)
-    ## write your code below this point
-    augmenting_paths, paths_present = augment(Gf, parents, s, t)
-    if (not paths_present):
+
+    # Check if an augmenting path exists in Gf from source to sink
+    augmenting_path, path_present = find_path(parents, s, t)
+    
+    # Return and exit program if no augmenting path exists
+    if (not path_present):
         print('No Solution Exists!')
         return
 
-    print(augmenting_paths)
-    flows = find_path(Gf, augmenting_paths)
-    # Flows: dict[tuple(<path>), flow value]
-    return flows
+    # If a path exists, compute the flow values for the current and subsequent augmenting paths
+    flowlist = {}
+    while path_present:
+        # Compute flow value for the current augmenting path
+        flow = compute_flow(Gf, augmenting_path)
 
-def augment(Gf: dict, parents: dict, source: int, sink: int):
-    # If the Sink node is not in the graph
-    if sink not in parents:
+        # Append the path and its corresponding flow value to the flowlist
+        ''' Reference: https://stackoverflow.com/questions/7257588/why-cant-i-use-a-list-as-a-dict-key-in-python '''
+        flowlist[tuple(augmenting_path)] = flow     # Convert list to tuple (lists not hashable in Python)
+
+        # Send flow from Source to Sink
+        for i in range(0, len(augmenting_path) - 1):
+            # Check if edge has remaining capacity
+            if Gf["adj"][augmenting_path[i]][augmenting_path[i + 1]] > flow:
+                Gf["adj"][augmenting_path[i]][augmenting_path[i + 1]] -= flow      # TODO: Check/Create flow update functions
+            else:
+                # Edge has no remaining capacity or capacity <= flow. 
+                # Either case, edge becomes critical. Remove this edge from the graph (adjacency list)
+                Gf["adj"][augmenting_path[i]].pop(augmenting_path[i + 1])
+
+            # Add Residual edges (REVERSE) if flow has been sent along this edge
+            # If there is no residual edge from v to u, add one and set the residual capacity as the flow value
+            if augmenting_path[i] not in Gf["adj"][augmenting_path[i + 1]].keys():
+                Gf["adj"][augmenting_path[i + 1]][augmenting_path[i]] = flow
+            else:
+                # Update the residual capacity
+                Gf["adj"][augmenting_path[i + 1]][augmenting_path[i]] += flow
+
+        # Run BFS again
+        _, parents, _ = sg.BFS(Gf, s)
+        # Find the next augmenting path through which flow can be sent
+        augmenting_path, path_present = find_path(parents, s, t)
+
+    return flowlist     # Flows: dict[tuple(<path>), flow value]
+
+def find_path(parents: dict, source: int, sink: int):
+    '''
+        "After determining if an augmenting path exists..."
+        Helper function to determine whether an augmenting path exists from Source to Sink.
+        IF yes, return the augmenting path
+    '''
+    # If the Source or Sink node is not in the graph, no augmenting path exists
+    if source not in parents.keys() or sink not in parents.keys():
         return [], False
 
-    augmenting_paths = []
-    temp = sink
-    while sink in parents:
-        path = []
-        curr = sink
-        while (curr is not source):
-            path.append(curr)
-            temp = curr
-            curr = parents[curr]
-            # Remove this path from node to the sink
-            if (temp is not sink):
-                sg.delEdge(Gf, curr, temp)
-        
-        sg.delEdge(Gf, source, temp)
-        path.append(source)
-        augmenting_paths.append(path.reverse())
-        _, parents, _ = sg.BFS(Gf, source)
-        print(parents)
+    # Check for an augmenting path
+    augmenting_path = []    # Maintain list for augmenting path nodes
+    curr = sink             # Temporary variable for iterating through the sink node
+    while parents[curr] is not None:        # Loop until we reach the source node
+        augmenting_path.insert(0, curr)     # Append vertex to the augmenting path
+        curr = parents[curr]                # Update the sink vertex
+    augmenting_path.insert(0, source)       # Append the source node
 
-    return augmenting_paths, True
+    return augmenting_path, True
 
+def compute_flow(Gf: dict, augmenting_path: list):
+    '''
+        Helper function to compute the flow value in an augmenting path (bottleneck capacity).
+    '''
+    flow = np.Inf   # Flow value (Defalut: INFINITY)
+    
+    for i in range (0, len(augmenting_path) - 1):
+        edge_capacity = Gf["adj"][augmenting_path[i]][augmenting_path[i + 1]]
+        # Compute flow (bottleneck capacity)
+        flow = min(flow, edge_capacity)
 
-def find_path(Gf, augmenting_paths):
-    pass
+    return flow     # The bottleneck capacity of the path
 
-def is_residual(capacity: int):
-    return capacity == 0
+def residual_edge_exists(Gf: dict, augmenting_path: list, u: int, v: int):
+    '''
+        Helper method to determine whether a residual edge exists from any vertex v to u (u, v in V)
+    '''
+    return augmenting_path[u] in Gf["adj"][augmenting_path[v]].keys()
 
-def capacity_left(capacity: int, flow: int):
-    return capacity - flow
-
-
+def capacity_left(Gf: dict, augmenting_path: list, u: int, v: int, flow: float):
+    '''
+        Helper method to determine whether there is capacity left on the edge(u, v)
+    '''
+    return Gf["adj"][augmenting_path[u]][augmenting_path[v]] > flow
 
 ############################################################
 #
