@@ -4,13 +4,9 @@
 # April 2022
 # 
 ############################################################
-from importlib.resources import path
 import sys
-import os
 import numpy as np
 import simplegraphs as sg
-import math
-import random
 
 MAX_WIDTH = 2000
 MAX_HEIGHT = 2000
@@ -21,14 +17,96 @@ def gold(coords):
 
 
 def rounding(matrix):
-    # write your code here
+    # Compute the individual row and column sum
+    # If any sum is not divisible by 10, then return and exit program
+    ''' There is an edge from source to every row vertex with capacity that is sum of the remainders of entries (% 10) in row. There is also an edge from every column vertex to sink with capacity that is the sum of the remainders of entries (% 10) in column. '''
+    row, column = 0, 0
+    row_sums, column_sums = [], []
     for i in range(0, len(matrix)):
         for j in range(0, len(matrix[0])):
-            pass
+            # Round down matrix items for flow value
+            row += matrix[i][j] % 10
+            column += matrix[j][i] % 10
+        
+        if (row % 10 != 0 or column % 10 != 0):
+            print('No Solution Exists!')
+            return
+        
+        # Individual row and column sums are multiples of 10 (Integers)
+        row_sums.append(row)
+        column_sums.append(column)
+        row, column = 0, 0
+    
+    # Compute the edge capacities of the intermediate edges from the row to column vertices using the following logic:
+    ''' We have a directed edge from row to column if and only if matrix[i][j] is not divisible by 10. The capacity of the edge (if it exists) is 10. '''
+    intermediates = []
+    for i in range(0, len(matrix)):
+        row = []
+        for j in range(0, len(matrix[0])):
+            if (matrix[i][j] % 10 > 0):
+                row.append(10)  # Set edge capacity to 10
+            else:
+                row.append(0)   # Do not include that edge (edge capacity = 0)
+        intermediates.append(row)
+
+    # Set the source and sink nodes of the biparite graph
+    source = 0
+    sink = len(matrix) + len(matrix[0]) + 1     # Length of rows + columns + 1
+    # Create a Bipartite Graph
+    BGraph = sg.emptyGraph(source)
+    # Construct the graph
+    # 1. Source to Rows
+    for i in range(0, len(row_sums)):
+        sg.addDirEdge(BGraph, source, i + 1, row_sums[i])    # e.g., 0 [Source] -(10)-> 1
+
+    # 2. Columns to Sink
+    num_rows = len(matrix)
+    for j in range(0, len(column_sums)):
+        sg.addDirEdge(BGraph, j + num_rows + 1, sink, column_sums[j])   # e.g., 4 -(20)-> 7 [Sink]
+
+    # 3. Rows to Columns
+    for i in range(0, len(intermediates)):
+        for j in range(0, len(intermediates[0])):
+            row = i + 1
+            column = len(intermediates) + j + 1
+            sg.addDirEdge(BGraph, row, column, intermediates[i][j])
+
+    # Compute MaxFlow on this bipartite graph
+    flows = maxflow(BGraph, source, sink)
+
+    # Round down the matrix by item % 10
+    for i in range(0, len(matrix)):
+        for j in range(0, len(matrix[0])):
+            matrix[i][j] -= (matrix[i][j]) % 10
+
+    # Maintain a visited list to track visited edges
+    visited = []
+
+    # Iterate through the flows of the bipartite graph
+    for augmenting_path in flows.keys():
+        # If the path is of standard size [source -> row -> column -> sink]
+        if len(augmenting_path) <= 4:
+            pathR, pathC = augmenting_path[1 : -1]
+            visited.append((pathR, pathC))
+            matrix[pathR - 1][pathC - len(matrix) - 1] += 10
+
+        else:   # Path has more than 4 vertices (residual edges)
+            path = list(augmenting_path[1 : -1])
+            while len(path) > 1:
+                curr = path.pop(0)
+                next = path[0]
+
+                if (curr > next):   # Backwards/Residual edge
+                    matrix[next - 1][curr - len(matrix) - 1] -= 10
+                else:
+                    # Check is (curr, next) has not yet been visited
+                    if (curr, next) not in visited:
+                        matrix[curr - 1][next - len(matrix) - 1] += 10
+
     return matrix
 
 
-def maxflow(G, s, t):
+def maxflow(G, s, t) -> dict[tuple, float]:
     Gf = sg.copyGraph(G)
     # Run the BFS algorithm to determine the parent pointers in the graph
     _, parents, _ = sg.BFS(Gf, s)
@@ -39,7 +117,7 @@ def maxflow(G, s, t):
     # Return and exit program if no augmenting path exists
     if (not path_present):
         print('No Solution Exists!')
-        return
+        return {}
 
     # If a path exists, compute the flow values for the current and subsequent augmenting paths
     flowlist = {}
