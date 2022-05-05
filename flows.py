@@ -20,22 +20,33 @@ def rounding(matrix):
     # Compute the individual row and column sum
     # If any sum is not divisible by 10, then return and exit program
     ''' There is an edge from source to every row vertex with capacity that is sum of the remainders of entries (% 10) in row. There is also an edge from every column vertex to sink with capacity that is the sum of the remainders of entries (% 10) in column. '''
-    row, column = 0, 0
-    row_sums, column_sums = [], []
+    row_sums = []
     for i in range(0, len(matrix)):
+        row = 0
         for j in range(0, len(matrix[0])):
             # Round down matrix items for flow value
             row += matrix[i][j] % 10
-            column += matrix[j][i] % 10
         
-        # if (row % 10 != 0 or column % 10 != 0):
-        #     print('No Solution Exists!')
-        #     return
+        if (row % 10 != 0):
+            print('No Solution Exists!')
+            return
         
-        # Individual row and column sums are multiples of 10 (Integers)
+        # Individual row sums are multiples of 10 (Integers)
         row_sums.append(row)
+
+    column_sums = []
+    for j in range(0, len(matrix[0])):
+        column = 0
+        for i in range(0, len(matrix)):
+            # Round down matrix items for flow value
+            column += matrix[i][j] % 10
+        
+        if (column % 10 != 0):
+            print('No Solution Exists!')
+            return
+        
+        # Individual column sums are multiples of 10 (Integers)
         column_sums.append(column)
-        row, column = 0, 0
     
     # Compute the edge capacities of the intermediate edges from the row to column vertices using the following logic:
     ''' We have a directed edge from row to column if and only if matrix[i][j] is not divisible by 10. The capacity of the edge (if it exists) is 10. '''
