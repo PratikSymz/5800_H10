@@ -21,44 +21,24 @@ def rounding(matrix):
     # If any sum is not divisible by 10, then return and exit program
     ''' There is an edge from source to every row vertex with capacity that is sum of the remainders of entries (% 10) in row. There is also an edge from every column vertex to sink with capacity that is the sum of the remainders of entries (% 10) in column. '''
     row_sums = []
-    for i in range(0, len(matrix)):
-        row = 0
-        for j in range(0, len(matrix[0])):
-            # Round down matrix items for flow value
-            row += matrix[i][j] % 10
-        
-        if (row % 10 != 0):
-            print('No Solution Exists!')
-            return
-        
-        # Individual row sums are multiples of 10 (Integers)
-        row_sums.append(row)
+    for row in matrix:
+        row_sums.append(sum([item % 10 for item in row]))
 
     column_sums = []
-    for j in range(0, len(matrix[0])):
-        column = 0
-        for i in range(0, len(matrix)):
-            # Round down matrix items for flow value
-            column += matrix[i][j] % 10
-        
-        if (column % 10 != 0):
-            print('No Solution Exists!')
-            return
-        
-        # Individual column sums are multiples of 10 (Integers)
-        column_sums.append(column)
+    for column in zip(*matrix):
+        column_sums.append(sum([item % 10 for item in column]))
     
     # Compute the edge capacities of the intermediate edges from the row to column vertices using the following logic:
     ''' We have a directed edge from row to column if and only if matrix[i][j] is not divisible by 10. The capacity of the edge (if it exists) is 10. '''
     intermediates = []
-    for i in range(0, len(matrix)):
-        row = []
-        for j in range(0, len(matrix[0])):
-            if (matrix[i][j] % 10 > 0):
-                row.append(10)  # Set edge capacity to 10
+    for row in matrix:
+        items = []
+        for item in row:
+            if (item % 10 > 0):
+                items.append(10)  # Set edge capacity to 10
             else:
-                row.append(0)   # Do not include that edge (edge capacity = 0)
-        intermediates.append(row)
+                items.append(0)   # Do not include that edge (edge capacity = 0)
+        intermediates.append(items)
 
     # Set the source and sink nodes of the biparite graph
     source = 0
@@ -67,23 +47,21 @@ def rounding(matrix):
     BGraph = sg.emptyGraph(source)
     # Construct the graph
     # 1. Source to Rows
-    for i in range(0, len(row_sums)):
-        if (row_sums[i] > 0):
-            sg.addDirEdge(BGraph, source, i + 1, row_sums[i])    # e.g., 0 [Source] -(10)-> 1
+    for i, row_sum in enumerate(row_sums):
+        sg.addDirEdge(BGraph, source, i + 1, row_sum)    # e.g., 0 [Source] -(10)-> 1
 
     # 2. Columns to Sink
     num_rows = len(matrix)
-    for j in range(0, len(column_sums)):
-        if (column_sums[j] > 0):
-            sg.addDirEdge(BGraph, j + num_rows + 1, sink, column_sums[j])   # e.g., 4 -(20)-> 7 [Sink]
+    for j, col_sum in enumerate(column_sums):
+        sg.addDirEdge(BGraph, j + num_rows + 1, sink, col_sum)   # e.g., 4 -(20)-> 7 [Sink]
 
     # 3. Rows to Columns
-    for i in range(0, len(intermediates)):
-        for j in range(0, len(intermediates[0])):
-            row = i + 1
-            column = len(intermediates[0]) + j + 1
-            if (intermediates[i][j] > 0):
-                sg.addDirEdge(BGraph, row, column, intermediates[i][j])
+    for i, capacities in enumerate(intermediates):
+        for j, capacity in enumerate(capacities):
+            if capacity:
+                row = i + 1
+                column = len(matrix[0]) + j + 1
+                sg.addDirEdge(BGraph, row, column, capacity)
 
     # Compute MaxFlow on this bipartite graph
     flows = maxflow(BGraph, source, sink)
@@ -111,14 +89,13 @@ def rounding(matrix):
                 next = path[0]
 
                 if (curr > next):   # Backwards/Residual edge
-                    matrix[next - 1][curr - len(matrix) - 1] -= 10
+                    matrix[curr - 1][next - len(matrix) - 1] -= 10  # TODO: Check
                 else:
                     # Check is (curr, next) has not yet been visited
                     if (curr, next) not in visited:
                         matrix[curr - 1][next - len(matrix) - 1] += 10
 
     return matrix
-
 
 def maxflow(G, s, t):
     Gf = sg.copyGraph(G)
@@ -175,18 +152,22 @@ def find_path(parents: dict, source, sink):
         IF yes, return the augmenting path
     '''
     # If the Source or Sink node is not in the graph, no augmenting path exists
-    if source not in parents.keys() or sink not in parents.keys():
+    if sink not in parents.keys():
         return [], False
 
     # Check for an augmenting path
     augmenting_path = []    # Maintain list for augmenting path nodes
     curr = sink             # Temporary variable for iterating through the sink node
-    while parents[curr] is not None:        # Loop until we reach the source node
-        augmenting_path.insert(0, curr)     # Append vertex to the augmenting path
-        curr = parents[curr]                # Update the sink vertex
-    augmenting_path.insert(0, source)       # Append the source node
+    while parents[sink] is not None:        # Loop until we reach the source node
+        while (sink != source):
+            augmenting_path.insert(0, sink)
+            sink = parents[sink]
+        augmenting_path.insert(0, sink)     # Append vertex to the augmenting path
+        return augmenting_path, True
+        #curr = parents[curr]                # Update the sink vertex
+    #augmenting_path.insert(0, source)       # Append the source node
 
-    return augmenting_path, True
+    return [], False
 
 def compute_flow(Gf: dict, augmenting_path: list):
     '''
