@@ -68,19 +68,22 @@ def rounding(matrix):
     # Construct the graph
     # 1. Source to Rows
     for i in range(0, len(row_sums)):
-        sg.addDirEdge(BGraph, source, i + 1, row_sums[i])    # e.g., 0 [Source] -(10)-> 1
+        if (row_sums[i] > 0):
+            sg.addDirEdge(BGraph, source, i + 1, row_sums[i])    # e.g., 0 [Source] -(10)-> 1
 
     # 2. Columns to Sink
     num_rows = len(matrix)
     for j in range(0, len(column_sums)):
-        sg.addDirEdge(BGraph, j + num_rows + 1, sink, column_sums[j])   # e.g., 4 -(20)-> 7 [Sink]
+        if (column_sums[j] > 0):
+            sg.addDirEdge(BGraph, j + num_rows + 1, sink, column_sums[j])   # e.g., 4 -(20)-> 7 [Sink]
 
     # 3. Rows to Columns
     for i in range(0, len(intermediates)):
         for j in range(0, len(intermediates[0])):
             row = i + 1
-            column = len(intermediates) + j + 1
-            sg.addDirEdge(BGraph, row, column, intermediates[i][j])
+            column = len(intermediates[0]) + j + 1
+            if (intermediates[i][j] > 0):
+                sg.addDirEdge(BGraph, row, column, intermediates[i][j])
 
     # Compute MaxFlow on this bipartite graph
     flows = maxflow(BGraph, source, sink)
@@ -88,7 +91,7 @@ def rounding(matrix):
     # Round down the matrix by item % 10
     for i in range(0, len(matrix)):
         for j in range(0, len(matrix[0])):
-            matrix[i][j] -= (matrix[i][j]) % 10
+            matrix[i][j] -= matrix[i][j] % 10
 
     # Maintain a visited list to track visited edges
     visited = []
@@ -97,7 +100,7 @@ def rounding(matrix):
     for augmenting_path in flows.keys():
         # If the path is of standard size [source -> row -> column -> sink]
         if len(augmenting_path) <= 4:
-            pathR, pathC = augmenting_path[1 : -1]
+            pathR, pathC = augmenting_path[-3 : -1]
             visited.append((pathR, pathC))
             matrix[pathR - 1][pathC - len(matrix) - 1] += 10
 
@@ -168,7 +171,7 @@ def maxflow(G, s, t):
 def find_path(parents: dict, source: int, sink: int):
     '''
         "After determining if an augmenting path exists..."
-        Helper function to determine whether an augmenting path exists from Source to Sink.
+        Helper method to determine whether an augmenting path exists from Source to Sink.
         IF yes, return the augmenting path
     '''
     # If the Source or Sink node is not in the graph, no augmenting path exists
@@ -189,7 +192,7 @@ def compute_flow(Gf: dict, augmenting_path: list):
     '''
         Helper function to compute the flow value in an augmenting path (bottleneck capacity).
     '''
-    flow = np.Inf   # Flow value (Defalut: INFINITY)
+    flow = np.Inf   # Flow value (Default: INFINITY)
     
     for i in range (0, len(augmenting_path) - 1):
         edge_capacity = Gf["adj"][augmenting_path[i]][augmenting_path[i + 1]]
