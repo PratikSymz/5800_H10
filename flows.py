@@ -5,6 +5,7 @@
 # 
 ############################################################
 import sys
+import os
 import numpy as np
 import simplegraphs as sg
 
@@ -13,205 +14,180 @@ MAX_HEIGHT = 2000
 
 def gold(coords):
     # write your code here
-    return []
+    
+    print(coords)
 
 
 def rounding(matrix):
-    # Compute the individual row and column sum
-    # If any sum is not divisible by 10, then return and exit program
-    ''' There is an edge from source to every row vertex with capacity that is sum of the remainders of entries (% 10) in row. There is also an edge from every column vertex to sink with capacity that is the sum of the remainders of entries (% 10) in column. '''
-    row_sums = []
-    for i in range(0, len(matrix)):
-        row = 0
-        for j in range(0, len(matrix[0])):
-            # Round down matrix items for flow value
-            row += matrix[i][j] % 10
-        
-        if (row % 10 != 0):
-            print('No Solution Exists!')
-            return
-        
-        # Individual row sums are multiples of 10 (Integers)
-        row_sums.append(row)
+    # write your code here
+    # print(matrix)
+    # print(type(matrix))
 
-    column_sums = []
-    for j in range(0, len(matrix[0])):
-        column = 0
-        for i in range(0, len(matrix)):
-            # Round down matrix items for flow value
-            column += matrix[i][j] % 10
-        
-        if (column % 10 != 0):
-            print('No Solution Exists!')
-            return
-        
-        # Individual column sums are multiples of 10 (Integers)
-        column_sums.append(column)
-    
-    # Compute the edge capacities of the intermediate edges from the row to column vertices using the following logic:
-    ''' We have a directed edge from row to column if and only if matrix[i][j] is not divisible by 10. The capacity of the edge (if it exists) is 10. '''
-    intermediates = []
-    for i in range(0, len(matrix)):
-        row = []
-        for j in range(0, len(matrix[0])):
-            if (matrix[i][j] % 10 > 0):
-                row.append(10)  # Set edge capacity to 10
+    sums_rows = [sum([item%10 for item in row]) for row in matrix]
+    sums_cols = [sum([item%10 for item in col]) for col in np.array(matrix).T]
+
+    # print(sums_rows)
+    # print(sums_cols)
+
+    filtered = []
+
+    for row in matrix:
+        a = []
+        for item in row:
+            if item % 10 > 0:
+                a.append(10)
             else:
-                row.append(0)   # Do not include that edge (edge capacity = 0)
-        intermediates.append(row)
+                a.append(0)
+        filtered.append(a) 
 
-    # Set the source and sink nodes of the biparite graph
-    source = 0
-    sink = len(matrix) + len(matrix[0]) + 1     # Length of rows + columns + 1
-    # Create a Bipartite Graph
-    BGraph = sg.emptyGraph(source)
-    # Construct the graph
-    # 1. Source to Rows
-    for i in range(0, len(row_sums)):
-        if (row_sums[i] > 0):
-            sg.addDirEdge(BGraph, source, i + 1, row_sums[i])    # e.g., 0 [Source] -(10)-> 1
+    #print(filtered)
 
-    # 2. Columns to Sink
-    num_rows = len(matrix)
-    for j in range(0, len(column_sums)):
-        if (column_sums[j] > 0):
-            sg.addDirEdge(BGraph, j + num_rows + 1, sink, column_sums[j])   # e.g., 4 -(20)-> 7 [Sink]
+    G = sg.emptyGraph(0)
+    p = 1
 
-    # 3. Rows to Columns
-    for i in range(0, len(intermediates)):
-        for j in range(0, len(intermediates[0])):
-            row = i + 1
-            column = len(intermediates[0]) + j + 1
-            if (intermediates[i][j] > 0):
-                sg.addDirEdge(BGraph, row, column, intermediates[i][j])
+    for i,row in enumerate(sums_rows):
+        sg.addDirEdge(G, 0, i+1, row)
+        p += 1
 
-    # Compute MaxFlow on this bipartite graph
-    flows = maxflow(BGraph, source, sink)
+    for i,col in enumerate(sums_cols):
+        sg.addDirEdge(G, p, len(matrix[0]) + len(matrix) + 1, col)
+        p += 1
 
-    # Round down the matrix by item % 10
-    for i in range(0, len(matrix)):
-        for j in range(0, len(matrix[0])):
-            matrix[i][j] -= matrix[i][j] % 10
+    for i, col_capacities in enumerate(filtered):
+        for j, cap in enumerate(col_capacities):
+            if cap:
+                sg.addDirEdge(G, i+1, len(matrix[0]) + j+1, cap)
 
-    # Maintain a visited list to track visited edges
-    visited = []
 
-    # Iterate through the flows of the bipartite graph
-    for augmenting_path in flows.keys():
-        # If the path is of standard size [source -> row -> column -> sink]
-        if len(augmenting_path) <= 4:
-            pathR, pathC = augmenting_path[-3 : -1]
-            visited.append((pathR, pathC))
-            matrix[pathR - 1][pathC - len(matrix) - 1] += 10
+    mf = maxflow(G, 0, len(matrix[0]) + len(matrix) + 1)
 
-        else:   # Path has more than 4 vertices (residual edges)
-            path = list(augmenting_path[1 : -1])
-            while len(path) > 1:
-                curr = path.pop(0)
-                next = path[0]
+    for i in range(len(matrix)):
+        for j in range(len(matrix[0])):
+            matrix [i][j] -= matrix[i][j] % 10
 
-                if (curr > next):   # Backwards/Residual edge
-                    matrix[next - 1][curr - len(matrix) - 1] -= 10
+
+    l = []
+
+    for x in mf.keys():
+        #print(x)
+
+        if len(x) > 4:
+            #print('x is larger than 3')
+
+            y = list(x[1:-1])
+            #print(y)
+
+            while len(y)>1:
+                p = y.pop(0)
+                q = y[0]
+
+                #print(p,q,y)
+
+                if p > q:
+                    matrix[q-1][p - len(matrix) - 1] -= 10
+                    print(matrix)
                 else:
-                    # Check is (curr, next) has not yet been visited
-                    if (curr, next) not in visited:
-                        matrix[curr - 1][next - len(matrix) - 1] += 10
+                    if (p,q) not in l:
+                        matrix[p-1][q - len(matrix) - 1] += 10
+                        print(matrix)
+
+        else:
+            a,b = x[-3:-1]
+            l.append((a,b))
+            #print(a,b, len(matrix))
+            matrix[a-1][b - len(matrix) - 1] += 10
+            print(matrix)
 
     return matrix
 
 
-def maxflow(G, s, t):
+def maxflow(G:dict, s:int, t:int) -> dict: 
     Gf = sg.copyGraph(G)
-    # Run the BFS algorithm to determine the parent pointers in the graph
-    _, parents, _ = sg.BFS(Gf, s)
+    ## write your code below this point
 
-    # Check if an augmenting path exists in Gf from source to sink
-    augmenting_path, path_present = find_path(parents, s, t)
-    
-    # Return and exit program if no augmenting path exists
-    if (not path_present):
-        print('No Solution Exists!')
-        return {}
+    # for i in Gf['adj']:
+    #         print(f"{i} : {Gf['adj'][i]}")
 
-    # If a path exists, compute the flow values for the current and subsequent augmenting paths
-    flowlist = {}
-    while path_present:
-        # Compute flow value for the current augmenting path
-        flow = compute_flow(Gf, augmenting_path)
+    flows = {}
 
-        # Append the path and its corresponding flow value to the flowlist
-        ''' Reference: https://stackoverflow.com/questions/7257588/why-cant-i-use-a-list-as-a-dict-key-in-python '''
-        flowlist[tuple(augmenting_path)] = flow     # Convert list to tuple (lists not hashable in Python)
+    _, parents, _ = sg.BFS(Gf,s)
 
-        # Send flow from Source to Sink
-        for i in range(0, len(augmenting_path) - 1):
-            # Check if edge has remaining capacity
-            if Gf["adj"][augmenting_path[i]][augmenting_path[i + 1]] > flow:
-                Gf["adj"][augmenting_path[i]][augmenting_path[i + 1]] -= flow      # TODO: Check/Create flow update functions
+    augment_exists, augmenting_path = augment(parents, s, t)
+
+    while augment_exists:
+
+        # print('flows.py::L41: augmenting path:',augmenting_path)
+
+        flow = find_flow(Gf,augmenting_path)
+        flows[tuple(augmenting_path)] = flow
+
+        # print('flows.py::L43: flow:',flow)
+        # for g in Gf['adj']:
+        #     print(g,":",Gf['adj'][g])
+
+        for i,_ in enumerate(augmenting_path[:-1]):
+            # print(f'flows.py::L46: capacity from {augmenting_path[i]} to {augmenting_path[i+1]}:', Gf['adj'][augmenting_path[i]][augmenting_path[i+1]])
+            #Forward:
+            if Gf['adj'][augmenting_path[i]][augmenting_path[i+1]] > flow:
+                Gf['adj'][augmenting_path[i]][augmenting_path[i+1]] -= flow
             else:
-                # Edge has no remaining capacity or capacity <= flow. 
-                # Either case, edge becomes critical. Remove this edge from the graph (adjacency list)
-                Gf["adj"][augmenting_path[i]].pop(augmenting_path[i + 1])
-
-            # Add Residual edges (REVERSE) if flow has been sent along this edge
-            # If there is no residual edge from v to u, add one and set the residual capacity as the flow value
-            if augmenting_path[i] not in Gf["adj"][augmenting_path[i + 1]].keys():
-                Gf["adj"][augmenting_path[i + 1]][augmenting_path[i]] = flow
+                Gf['adj'][augmenting_path[i]].pop(augmenting_path[i+1])
+            
+            #Residual:
+            if augmenting_path[i] in Gf['adj'][augmenting_path[i+1]].keys():
+                Gf['adj'][augmenting_path[i+1]][augmenting_path[i]] += flow
             else:
-                # Update the residual capacity
-                Gf["adj"][augmenting_path[i + 1]][augmenting_path[i]] += flow
+                Gf['adj'][augmenting_path[i+1]][augmenting_path[i]] = flow
 
-        # Run BFS again
-        _, parents, _ = sg.BFS(Gf, s)
-        # Find the next augmenting path through which flow can be sent
-        augmenting_path, path_present = find_path(parents, s, t)
+        _, parents, _ = sg.BFS(Gf,s)
 
-    return flowlist     # Flows: dict[tuple(<path>), flow value]
+        augment_exists, augmenting_path = augment(parents, s, t)
 
-def find_path(parents: dict, source: int, sink: int):
-    '''
-        "After determining if an augmenting path exists..."
-        Helper method to determine whether an augmenting path exists from Source to Sink.
-        IF yes, return the augmenting path
-    '''
-    # If the Source or Sink node is not in the graph, no augmenting path exists
-    if source not in parents.keys() or sink not in parents.keys():
-        return [], False
+    return flows
 
-    # Check for an augmenting path
-    augmenting_path = []    # Maintain list for augmenting path nodes
-    curr = sink             # Temporary variable for iterating through the sink node
-    while parents[curr] is not None:        # Loop until we reach the source node
-        augmenting_path.insert(0, curr)     # Append vertex to the augmenting path
-        curr = parents[curr]                # Update the sink vertex
-    augmenting_path.insert(0, source)       # Append the source node
+############################################################
+# Helpers
+############################################################
 
-    return augmenting_path, True
+def augment(parents:dict, s:int, t:int) -> tuple:
+    path = []
+    if t not in parents.keys():
+        return False, []
 
-def compute_flow(Gf: dict, augmenting_path: list):
-    '''
-        Helper function to compute the flow value in an augmenting path (bottleneck capacity).
-    '''
-    flow = np.Inf   # Flow value (Default: INFINITY)
-    
-    for i in range (0, len(augmenting_path) - 1):
-        edge_capacity = Gf["adj"][augmenting_path[i]][augmenting_path[i + 1]]
-        # Compute flow (bottleneck capacity)
-        flow = min(flow, edge_capacity)
+    while parents[t] is not None:
+        path.append(t)
+        if parents[t] == s:
+            path.append(parents[t])
+            path.reverse()
+            return True, path
+        t = parents[t]
+    return False, []
 
-    return flow     # The bottleneck capacity of the path
+def find_flow(G:dict, path:list) -> float:
+    flow = np.inf
+    while len(path) > 1:
+        # print(f'Edge between {path[0]} and {path[1]}')
+        # print('flows.py::L80: path',path)
+        # print('flows.py::L81: flow',flow)
+        cap = G['adj'][path[0]][path[1]]
+        # print('flows.py::L83: Capacity:',cap)
+        flow = min(flow, cap)
+        path = path[1:]
 
-def residual_edge_exists(Gf: dict, augmenting_path: list, u: int, v: int):
-    '''
-        Helper method to determine whether a residual edge exists from any vertex v to u (u, v in V)
-    '''
-    return augmenting_path[u] in Gf["adj"][augmenting_path[v]].keys()
+    # print(f'flows.py::L87: final flow: {flow}')
 
-def capacity_left(Gf: dict, augmenting_path: list, u: int, v: int, flow: float):
-    '''
-        Helper method to determine whether there is capacity left on the edge(u, v)
-    '''
-    return Gf["adj"][augmenting_path[u]][augmenting_path[v]] > flow
+    return flow
+
+def createKey(x, y):
+    return str(x) + ":" + str(y)
+
+def determine_color(x, y):
+    if (x % 2 == 0) and (y % 2 == 0):
+        return True
+    else:
+        return False 
+
+############################################################
 
 ############################################################
 #
@@ -220,35 +196,6 @@ def capacity_left(Gf: dict, augmenting_path: list, u: int, v: int, flow: float):
 # help you test
 # 
 ############################################################
-
-def main(args = []):
-    # Expects 2 command-line arguments:
-    # 1) name of a file describing the graph
-    if len(args) < 2:
-        print("Too few arguments! There should be at least 4.")
-        print("flows.py <cmd> <file>")
-        return
-
-    task = args[0]
-    if task == "gold":
-        coords = read_input(args[1])
-        gold(coords)   
-    elif task == "rounding":
-        matrix = read_input(args[1])
-        nm = rounding(matrix)
-        if compare_matrix(matrix, nm):
-            print_matrix(nm)
-    elif task == "maxflow":
-        # the following may help you test your maxflow solution
-        graph_file = args[1]
-        s = int(args[2])
-        t = int(args[3])
-        G = sg.readGraph(graph_file) # Read the graph from disk
-        flow = maxflow(G, s, t)
-        print(flow)
-
-    return
-
 
 def read_input(filename):
     with open(filename, 'r') as f:
@@ -287,6 +234,34 @@ def compare_matrix(m1,m2):
             return False
 
     return True
+
+def main(args = []):
+    # Expects 2 command-line arguments:
+    # 1) name of a file describing the graph
+    if len(args) < 2:
+        print("Too few arguments! There should be at least 4.")
+        print("flows.py <cmd> <file>")
+        return
+
+    task = args[0]
+    if task == "gold":
+        coords = read_input(args[1])
+        gold(coords)   
+    elif task == "rounding":
+        matrix = read_input(args[1])
+        nm = rounding(matrix)
+        if compare_matrix(matrix, nm):
+            print_matrix(nm)
+    elif task == "maxflow":
+        # the following may help you test your maxflow solution
+        graph_file = args[1]
+        s = int(args[2])
+        t = int(args[3])
+        G = sg.readGraph(graph_file) # Read the graph from disk
+        flow = maxflow(G, s, t)
+        print(flow)
+
+    return
 
 if __name__ == "__main__":
     main(sys.argv[1:])    
