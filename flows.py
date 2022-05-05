@@ -28,9 +28,9 @@ def rounding(matrix):
             row += matrix[i][j] % 10
             column += matrix[j][i] % 10
         
-        if (row % 10 != 0 or column % 10 != 0):
-            print('No Solution Exists!')
-            return
+        # if (row % 10 != 0 or column % 10 != 0):
+        #     print('No Solution Exists!')
+        #     return
         
         # Individual row and column sums are multiples of 10 (Integers)
         row_sums.append(row)
@@ -106,7 +106,7 @@ def rounding(matrix):
     return matrix
 
 
-def maxflow(G, s, t) -> dict[tuple, float]:
+def maxflow(G, s, t):
     Gf = sg.copyGraph(G)
     # Run the BFS algorithm to determine the parent pointers in the graph
     _, parents, _ = sg.BFS(Gf, s)
